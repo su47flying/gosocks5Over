@@ -76,6 +76,19 @@ var (
 	} // large buff pool for udp
 )
 
+
+func Socks5OverDeCoder(buf []byte, offset, end int) {
+	for i := offset; i < end; i++ {
+		buf[i] = buf[i] ^ 0x33
+	}
+}
+
+func Socks5OverEnCoder(buf []byte, offset, end int) {
+	for i := 0; i < end; i++ {
+		buf[i] = buf[i] ^ 0x33
+	}
+}
+
 /*
 Method selection
  +----+----------+----------+
@@ -93,7 +106,7 @@ func ReadMethods(r io.Reader) ([]uint8, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	Socks5OverDeCoder(b, 0, n)
 	if b[0] != Ver5 {
 		return nil, ErrBadVersion
 	}
@@ -107,8 +120,8 @@ func ReadMethods(r io.Reader) ([]uint8, error) {
 		if _, err := io.ReadFull(r, b[n:length]); err != nil {
 			return nil, err
 		}
+		Socks5OverDeCoder(b, n, length)
 	}
-
 	methods := make([]byte, int(b[1]))
 	copy(methods, b[2:length])
 
@@ -116,7 +129,9 @@ func ReadMethods(r io.Reader) ([]uint8, error) {
 }
 
 func WriteMethod(method uint8, w io.Writer) error {
-	_, err := w.Write([]byte{Ver5, method})
+	m := []byte{Ver5, method}
+	Socks5OverEnCoder(m, 0, 2)
+	_, err := w.Write(m)
 	return err
 }
 
@@ -402,7 +417,7 @@ func ReadRequest(r io.Reader) (*Request, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	Socks5OverDeCoder(b, 0, n)
 	if b[0] != Ver5 {
 		return nil, ErrBadVersion
 	}
@@ -428,6 +443,7 @@ func ReadRequest(r io.Reader) (*Request, error) {
 		if _, err := io.ReadFull(r, b[n:length]); err != nil {
 			return nil, err
 		}
+		Socks5OverDeCoder(b, n, length)
 	}
 	addr := new(Addr)
 	if err := addr.Decode(b[3:length]); err != nil {
@@ -454,7 +470,7 @@ func (r *Request) Write(w io.Writer) (err error) {
 	}
 	n, _ := addr.Encode(b[3:])
 	length := 3 + n
-
+	Socks5OverEnCoder(b, 0, length)
 	_, err = w.Write(b[:length])
 	return
 }
@@ -497,7 +513,7 @@ func ReadReply(r io.Reader) (*Reply, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	Socks5OverDeCoder(b, 0, n)
 	if b[0] != Ver5 {
 		return nil, ErrBadVersion
 	}
@@ -523,6 +539,7 @@ func ReadReply(r io.Reader) (*Reply, error) {
 		if _, err := io.ReadFull(r, b[n:length]); err != nil {
 			return nil, err
 		}
+		Socks5OverDeCoder(b, n, length)
 	}
 
 	addr := new(Addr)
@@ -550,6 +567,7 @@ func (r *Reply) Write(w io.Writer) (err error) {
 		n, _ := r.Addr.Encode(b[3:])
 		length = 3 + n
 	}
+	Socks5OverEnCoder(b, 0, length)
 	_, err = w.Write(b[:length])
 
 	return

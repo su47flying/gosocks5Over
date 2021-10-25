@@ -78,7 +78,7 @@ func (conn *Conn) clientHandshake() error {
 	b[0] = Ver5
 	b[1] = uint8(nm)
 	copy(b[2:], methods)
-
+	Socks5OverEnCoder(b, 0, len(b))
 	if _, err := conn.c.Write(b); err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (conn *Conn) clientHandshake() error {
 	if _, err := io.ReadFull(conn.c, b[:2]); err != nil {
 		return err
 	}
-
+	Socks5OverDeCoder(b, 0, 2)
 	if b[0] != Ver5 {
 		return ErrBadVersion
 	}
@@ -115,7 +115,9 @@ func (conn *Conn) serverHandshake() error {
 		method = conn.selector.Select(methods...)
 	}
 
-	if _, err := conn.c.Write([]byte{Ver5, method}); err != nil {
+	m := []byte{Ver5, method}
+	Socks5OverEnCoder(m, 0, 2)
+	if _, err := conn.c.Write(m); err != nil {
 		return err
 	}
 
